@@ -130,8 +130,8 @@ def nb_voisins(matrice, i, j):
 
 def nouvelle_generation(matrice):
     nouvelle_matrice = generer_matrice_vide()
-    for i in range(50):
-        for j in range(50):
+    for i in range(30):
+        for j in range(30):
             nb = nb_voisins(matrice, i+2, j+2)
             if matrice[i+2][j+2] == 1:
                 if nb == 2 or nb == 3:
