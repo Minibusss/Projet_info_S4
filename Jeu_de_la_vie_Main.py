@@ -128,6 +128,11 @@ def nb_voisins(matrice, i, j):
     nb += voisins_bas_droite(matrice, i, j)
     return nb
 
+#azihyripuqvsvf
+
+
+
+
 def nouvelle_generation(matrice):
     nouvelle_matrice = generer_matrice_vide()
     for i in range(50):
