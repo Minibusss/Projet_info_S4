@@ -145,9 +145,9 @@ def nouvelle_generation(matrice):
                     nouvelle_matrice[i+2][j+2] = 0
     return nouvelle_matrice
             
-matrice1 = generer_matrice()
+"""matrice1 = generer_matrice()
 afficher_matrice(matrice1)
 print("-----------------------------------------------------------------------------------------------------------")
 matrice2 = nouvelle_generation(matrice1)
-afficher_matrice(matrice2)
+afficher_matrice(matrice2)"""
 
