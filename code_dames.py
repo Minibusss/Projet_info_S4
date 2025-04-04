@@ -2,11 +2,11 @@ from tkinter import *
 
 piece_selectionee = None
 coups_possibles = []
-CASES_JOUABLES = 'black'  # ou 'white' pour jouer sur les cases blanches
+CASES_JOUABLES = 'white'  # ou 'white' pour jouer sur les cases noires
 
 def est_case_jouable(row, col):
     #Vérifie si une case est jouable selon la configuration
-    return (row + col) % 2 == (1 if CASES_JOUABLES == 'black' else 0)
+    return (row + col) % 2 == (1 if CASES_JOUABLES == 'white' else 0)
 
 def placer_piece(row, col, piece):
     piece.grid(row=row, column=col)
@@ -24,8 +24,8 @@ def click_pion(event, row, col):
     
     # Vérifie si la case est jouable
     if not est_case_jouable(row, col):
-        print(f"Case {CASES_JOUABLES=='black' and 'blanche' or 'noire'} non jouable en {row},{col}")
-        Label(fenetre, text=f"Case {CASES_JOUABLES=='black' and 'blanche' or 'noire'} non jouable", 
+        print(f"Case {CASES_JOUABLES=='black' and 'noire' or 'blanche'} non jouable en {row},{col}")
+        Label(fenetre, text=f"Case {CASES_JOUABLES=='black' and 'noire' or 'blanche'} non jouable", 
               bg='red').grid(row=8, column=0, columnspan=8)
         if piece_selectionee is not None:
             piece_selectionee = None
