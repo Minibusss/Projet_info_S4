@@ -2,11 +2,15 @@ from tkinter import *
 
 piece_selectionee = None
 coups_possibles = []
+CASES_JOUABLES = 'black'  # ou 'white' pour jouer sur les cases blanches
+
+def est_case_jouable(row, col):
+    #Vérifie si une case est jouable selon la configuration
+    return (row + col) % 2 == (1 if CASES_JOUABLES == 'black' else 0)
 
 def placer_piece(row, col, piece):
     piece.grid(row=row, column=col)
     return piece  # Fonction pour placer une pièce sur le damier
-
 
 def click_pion(event, row, col):
     global piece_selectionee, coups_possibles
@@ -18,10 +22,11 @@ def click_pion(event, row, col):
     for widget in fenetre.grid_slaves(row=8):
         widget.destroy()
     
-    # Vérifie si la case est noire (non jouable)
-    if (row + col) % 2 != 0:  # Les cases noires sont celles où la somme des coordonnées est paire
-        print(f"Case noire non jouable en {row},{col}")
-        Label(fenetre, text="Case noire non jouable", bg='red').grid(row=8, column=0, columnspan=8)
+    # Vérifie si la case est jouable
+    if not est_case_jouable(row, col):
+        print(f"Case {CASES_JOUABLES=='black' and 'blanche' or 'noire'} non jouable en {row},{col}")
+        Label(fenetre, text=f"Case {CASES_JOUABLES=='black' and 'blanche' or 'noire'} non jouable", 
+              bg='red').grid(row=8, column=0, columnspan=8)
         if piece_selectionee is not None:
             piece_selectionee = None
             coups_possibles = []
@@ -125,8 +130,6 @@ def montre_coups_possibles(moves, blocked):
         widget = fenetre.grid_slaves(row=row, column=col)[0]
         widget.configure(bg='red')
 
-
-
 def creer_pion(couleur, row, col):
     bg_color = 'white' if (row+col)%2==0 else 'black'
     pion = Canvas(fenetre, width=80, height=80, bg=bg_color)
@@ -158,6 +161,30 @@ def deplacer_piece(old_row, old_col, new_row, new_col):
             new_canvas.create_oval(10, 10, 70, 70, fill=piece_color, 
                                  outline='black' if piece_color=='white' else 'white', width=2)
 
+def creer_damier():
+    """Crée le damier avec la bonne configuration des cases jouables"""
+    for i in range(8):
+        for j in range(8):
+            # Inverse les couleurs si on joue sur les cases blanches
+            bg_color = 'white' if (i+j)%2==0 else 'black'
+            frame = Canvas(fenetre, width=80, height=80, bg=bg_color)
+            frame.grid(row=i, column=j)
+            frame.bind('<Button-1>', lambda event, r=i, c=j: click_pion(event, r, c))
+
+def placer_pions_initiaux():
+    """Place les pions selon la configuration des cases jouables"""
+    for j in range(3):
+        for i in range(0,7,2):
+            # Ajuste la position selon les cases jouables
+            col = i if (j%2 == (0 if CASES_JOUABLES == 'black' else 1)) else i+1
+            pion_blanc = creer_pion('white', j, col)
+            placer_piece(j, col, pion_blanc)
+        for k in range(1,8,2):
+            # Ajuste la position selon les cases jouables
+            col = k if (j%2 == (0 if CASES_JOUABLES == 'black' else 1)) else k-1
+            pion_noir = creer_pion('black', 7-j, col)
+            placer_piece(7-j, col, pion_noir)
+
 # Création de la fenêtre principale
 fenetre = Tk()
 fenetre.title("Jeu de dames")
@@ -165,20 +192,6 @@ fenetre.geometry("1000x750")
 fenetre.resizable(width=False, height=False)
 fenetre.iconbitmap("dames.ico")
 
-# On créé le damier
-for i in range(8):
-    for j in range(8):
-        frame = Canvas(fenetre, width=80, height=80, bg='white' if (i+j)%2==0 else 'black')
-        frame.grid(row=i, column=j)
-        frame.bind('<Button-1>', lambda event, r=i, c=j: click_pion(event, r, c))
-
-# Placement des pions
-for j in range(3):
-    for i in range(0,7,2):
-        pion_blanc = creer_pion('white', j, i if j%2==0 else i+1)
-        placer_piece(j, i if j%2==0 else i+1, pion_blanc)
-    for k in range(1,8,2):
-        pion_noir = creer_pion('black', 7-j, k if j%2==0 else k-1)
-        placer_piece(7-j, k if j%2==0 else k-1, pion_noir)
-
+creer_damier()
+placer_pions_initiaux()
 fenetre.mainloop()
