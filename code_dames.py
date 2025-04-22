@@ -88,13 +88,15 @@ def click_pion(event, row, col):
 def calcul_coups_possibles(row, col):
     moves = []
     coups_bloques = []
-    captures = []  # Nouveau: stocke les captures possibles
+    captures = []
     
     widgets = fenetre.grid_slaves(row=row, column=col)
     if widgets and hasattr(widgets[0], 'find_all'):
         piece_items = widgets[0].find_all()
         if piece_items:
             piece_color = widgets[0].itemcget(piece_items[0], 'fill')
+            is_dame = len(widgets[0].find_all()) > 1  # Vérifie si c'est une dame
+            
             # Vérifie les captures dans toutes les directions
             captures = cherche_captures(row, col, piece_color, [])
             
@@ -102,58 +104,116 @@ def calcul_coups_possibles(row, col):
             if captures:
                 return captures, coups_bloques
             
-            # Sinon, chercher les mouvements simples
-            # Direction dépend de la couleur du pion
-            direction = 1 if piece_color == 'white' else -1  # blanc vers le bas, noir vers le haut
-            
-            for dx in [-1, 1]:  # Gauche et droite
-                new_row = row + direction
-                new_col = col + dx
-                if 0 <= new_row < 8 and 0 <= new_col < 8:
-                    widgets = fenetre.grid_slaves(row=new_row, column=new_col)
-                    if widgets and hasattr(widgets[0], 'find_all') and widgets[0].find_all():
-                        coups_bloques.append((new_row, new_col))
-                    else:
-                        moves.append((new_row, new_col))
+            # Pour une dame, on peut bouger dans toutes les directions sur plusieurs cases
+            if is_dame:
+                for direction_y in [-1, 1]:  # Haut et bas
+                    for direction_x in [-1, 1]:  # Gauche et droite
+                        current_row = row
+                        current_col = col
+                        while True:
+                            new_row = current_row + direction_y
+                            new_col = current_col + direction_x
+                            
+                            # Vérifier si on est toujours sur le damier
+                            if not (0 <= new_row < 8 and 0 <= new_col < 8):
+                                break
+                                
+                            # Vérifier si la case est occupée
+                            widgets = fenetre.grid_slaves(row=new_row, column=new_col)
+                            if widgets and hasattr(widgets[0], 'find_all') and widgets[0].find_all():
+                                coups_bloques.append((new_row, new_col))
+                                break
+                            else:
+                                moves.append((new_row, new_col))
+                            
+                            current_row = new_row
+                            current_col = new_col
+            else:
+                # Pour un pion normal, la direction dépend de la couleur
+                direction = 1 if piece_color == 'white' else -1
+                for dx in [-1, 1]:  # Gauche et droite
+                    new_row = row + direction
+                    new_col = col + dx
+                    if 0 <= new_row < 8 and 0 <= new_col < 8:
+                        widgets = fenetre.grid_slaves(row=new_row, column=new_col)
+                        if widgets and hasattr(widgets[0], 'find_all') and widgets[0].find_all():
+                            coups_bloques.append((new_row, new_col))
+                        else:
+                            moves.append((new_row, new_col))
     
     return moves, coups_bloques
 
 def cherche_captures(row, col, piece_color, chemin_parcouru=None):
-    """Cherche récursivement toutes les captures possibles"""
     if chemin_parcouru is None:
         chemin_parcouru = []
     
     captures = []
+    widgets = fenetre.grid_slaves(row=row, column=col)
+    is_dame = len(widgets[0].find_all()) > 1 if widgets else False
     
-    # Vérifie les captures dans toutes les directions
-    for direction in [-1, 1]:  # Avant et arrière
-        for dx in [-1, 1]:  # Gauche et droite
-            new_row = row + direction * 2
-            new_col = col + dx * 2
-            
-            # Position du pion à capturer
-            capture_row = row + direction
-            capture_col = col + dx
-            
-            if 0 <= new_row < 8 and 0 <= new_col < 8:
-                # Vérifie si il y a un pion adverse à capturer
-                capture_widgets = fenetre.grid_slaves(row=capture_row, column=capture_col)
-                if (capture_widgets and hasattr(capture_widgets[0], 'find_all') 
-                    and capture_widgets[0].find_all()):
-                    capture_items = capture_widgets[0].find_all()
-                    if capture_items:
+    # Pour une dame, on cherche dans toutes les directions diagonales jusqu'à trouver une pièce
+    if is_dame:
+        for direction_y in [-1, 1]:  # Haut et bas
+            for direction_x in [-1, 1]:  # Gauche et droite
+                current_row = row
+                current_col = col
+                piece_trouvee = None
+                
+                while True:
+                    new_row = current_row + direction_y
+                    new_col = current_col + direction_x
+                    
+                    # Sortie du damier
+                    if not (0 <= new_row < 8 and 0 <= new_col < 8):
+                        break
+                    
+                    # Vérifie si la case contient une pièce
+                    widgets = fenetre.grid_slaves(row=new_row, column=new_col)
+                    if widgets and hasattr(widgets[0], 'find_all') and widgets[0].find_all():
+                        if piece_trouvee:  # Deuxième pièce trouvée = impossible de capturer
+                            break
+                        piece_items = widgets[0].find_all()
+                        other_color = widgets[0].itemcget(piece_items[0], 'fill')
+                        if other_color != piece_color:  # Pièce adverse trouvée
+                            piece_trouvee = (new_row, new_col)
+                        else:  # Pièce de même couleur = bloqué
+                            break
+                    elif piece_trouvee:  # Case vide après une pièce adverse = capture possible
+                        if (new_row, new_col) not in chemin_parcouru:
+                            captures.append((new_row, new_col))
+                            # Cherche d'autres captures possibles après celle-ci
+                            suites = cherche_captures(new_row, new_col, piece_color, 
+                                                    chemin_parcouru + [(row, col)])
+                            captures.extend(suites)
+                    
+                    current_row = new_row
+                    current_col = new_col
+    else:
+        # Pour un pion normal, on peut capturer dans toutes les directions
+        for direction in [-1, 1]:  # On autorise les deux directions (avant et arrière)
+            for dx in [-1, 1]:  # Gauche et droite
+                new_row = row + direction * 2
+                new_col = col + dx * 2
+                
+                # Position du pion à capturer
+                capture_row = row + direction
+                capture_col = col + dx
+                
+                if 0 <= new_row < 8 and 0 <= new_col < 8:
+                    # Vérifie le pion à capturer
+                    capture_widgets = fenetre.grid_slaves(row=capture_row, column=capture_col)
+                    if (capture_widgets and hasattr(capture_widgets[0], 'find_all') 
+                        and capture_widgets[0].find_all()):
+                        capture_items = capture_widgets[0].find_all()
                         other_color = capture_widgets[0].itemcget(capture_items[0], 'fill')
                         
-                        # Vérifie si c'est un pion adverse et si la case d'arrivée est libre
+                        # Vérifie la case d'arrivée
                         dest_widgets = fenetre.grid_slaves(row=new_row, column=new_col)
                         if (other_color != piece_color and dest_widgets 
                             and not (hasattr(dest_widgets[0], 'find_all') 
                             and dest_widgets[0].find_all())):
-                            
-                            # Évite de repasser par le même chemin
                             if (new_row, new_col) not in chemin_parcouru:
                                 captures.append((new_row, new_col))
-                                # Cherche d'autres captures possibles après celle-ci
                                 suites = cherche_captures(new_row, new_col, piece_color, 
                                                         chemin_parcouru + [(row, col)])
                                 captures.extend(suites)
@@ -191,11 +251,12 @@ def deplacer_piece(old_row, old_col, new_row, new_col):
         raise ValueError(f"Pas de pièce à la position : ({old_row}, {old_col})")
     old_piece = old_widgets[0]
     
-    # Récupérer la couleur du pion
+    # Récupérer la couleur du pion et vérifier si c'est une dame
     piece_items = old_piece.find_all()
     if not piece_items:
         return
     piece_color = old_piece.itemcget(piece_items[0], 'fill')
+    is_already_dame = len(piece_items) > 1  # Vérifie si c'était déjà une dame
     
     # Vérifier s'il y a capture (distance > 1)
     if abs(new_row - old_row) > 1:
@@ -219,8 +280,19 @@ def deplacer_piece(old_row, old_col, new_row, new_col):
     if new_widgets:
         new_canvas = new_widgets[0]
         new_canvas.configure(bg='white' if (new_row + new_col) % 2 == 0 else 'black')
+        
+        # Devient ou reste une dame si :
+        # - c'était déjà une dame
+        # - ou si on atteint la dernière rangée
+        is_dame = is_already_dame or (piece_color == 'white' and new_row == 7) or (piece_color == 'black' and new_row == 0)
+        
+        # Dessiner le pion
         new_canvas.create_oval(10, 10, 70, 70, fill=piece_color, 
                              outline='black' if piece_color=='white' else 'white', width=2)
+        # Si c'est une dame, ajouter la couronne
+        if is_dame:
+            new_canvas.create_oval(20, 20, 60, 60, fill='gold', 
+                                 outline='black' if piece_color=='white' else 'white', width=2)
     
     # Vérifier s'il y a d'autres captures possibles
     if abs(new_row - old_row) > 1:
