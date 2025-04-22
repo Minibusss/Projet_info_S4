@@ -66,12 +66,28 @@ def click_pion(event, row, col):
                 # Continuer avec le même pion
                 piece_selectionee = (row, col)
                 coups_possibles, coups_bloques = calcul_coups_possibles(row, col)
-                montre_coups_possibles(coups_possibles, coups_bloques)
+                if coups_possibles:  # S'il y a des captures possibles
+                    montre_coups_possibles(coups_possibles, coups_bloques)
+                    return  # Continue le tour
+            
+            # Sinon, fin du tour
+            piece_selectionee = None
+            coups_possibles = []
+            tour_blanc = not tour_blanc
+            
+            # Vérifier s'il y a un gagnant
+            gagnant = verifier_victoire()
+            if gagnant:
+                message = f"Victoire des {gagnant} !"
+                Label(fenetre, text=message, bg='gold', font=('Arial', 14, 'bold')).grid(
+                    row=8, column=0, columnspan=8)
+                # Désactiver les événements de click
+                for i in range(8):
+                    for j in range(8):
+                        widgets = fenetre.grid_slaves(row=i, column=j)
+                        if widgets:
+                            widgets[0].unbind('<Button-1>')
             else:
-                # Fin du tour
-                piece_selectionee = None
-                coups_possibles = []
-                tour_blanc = not tour_blanc
                 Label(fenetre, text=f"Tour des {tour_blanc and 'blancs' or 'noirs'}", 
                       bg='white').grid(row=8, column=0, columnspan=8)
         elif (row, col)==piece_selectionee:
@@ -260,16 +276,32 @@ def deplacer_piece(old_row, old_col, new_row, new_col):
     
     # Vérifier s'il y a capture (distance > 1)
     if abs(new_row - old_row) > 1:
-        # Calculer la position du pion capturé
-        captured_row = (old_row + new_row) // 2
-        captured_col = (old_col + new_col) // 2
-        
-        # Supprimer le pion capturé
-        captured_widgets = fenetre.grid_slaves(row=captured_row, column=captured_col)
-        if captured_widgets:
-            captured_piece = captured_widgets[0]
-            captured_piece.delete("all")
-            captured_piece.configure(bg='white' if (captured_row + captured_col) % 2 == 0 else 'black')
+        # Pour une dame, on doit trouver le pion capturé sur la diagonale
+        if is_already_dame:
+            direction_y = 1 if new_row > old_row else -1
+            direction_x = 1 if new_col > old_col else -1
+            current_row = old_row
+            current_col = old_col
+            
+            # Parcourir la diagonale jusqu'à trouver le pion à capturer
+            while current_row != new_row and current_col != new_col:
+                current_row += direction_y
+                current_col += direction_x
+                widgets = fenetre.grid_slaves(row=current_row, column=current_col)
+                if widgets and hasattr(widgets[0], 'find_all') and widgets[0].find_all():
+                    # Pion trouvé, on le supprime
+                    widgets[0].delete("all")
+                    widgets[0].configure(bg='white' if (current_row + current_col) % 2 == 0 else 'black')
+                    break
+        else:
+            # Pour un pion normal, on utilise le milieu
+            captured_row = (old_row + new_row) // 2
+            captured_col = (old_col + new_col) // 2
+            captured_widgets = fenetre.grid_slaves(row=captured_row, column=captured_col)
+            if captured_widgets:
+                captured_piece = captured_widgets[0]
+                captured_piece.delete("all")
+                captured_piece.configure(bg='white' if (captured_row + captured_col) % 2 == 0 else 'black')
     
     # Supprimer le pion de l'ancienne position
     old_piece.delete("all")
@@ -325,6 +357,39 @@ def placer_pions_initiaux():
             col = k if (j%2 == (0 if CASES_JOUABLES == 'black' else 1)) else k-1
             pion_noir = creer_pion('black', 7-j, col)
             placer_piece(7-j, col, pion_noir)
+
+def verifier_victoire():
+    """Vérifie s'il y a un gagnant"""
+    pieces_blanches = 0
+    pieces_noires = 0
+    mouvements_blancs = False
+    mouvements_noirs = False
+    
+    # Compte les pièces et vérifie les mouvements possibles
+    for i in range(8):
+        for j in range(8):
+            widgets = fenetre.grid_slaves(row=i, column=j)
+            if widgets and hasattr(widgets[0], 'find_all'):
+                piece_items = widgets[0].find_all()
+                if piece_items:
+                    piece_color = widgets[0].itemcget(piece_items[0], 'fill')
+                    if piece_color == 'white':
+                        pieces_blanches += 1
+                        coups, _ = calcul_coups_possibles(i, j)
+                        if coups:
+                            mouvements_blancs = True
+                    else:
+                        pieces_noires += 1
+                        coups, _ = calcul_coups_possibles(i, j)
+                        if coups:
+                            mouvements_noirs = True
+    
+    # Vérifie les conditions de victoire
+    if pieces_blanches == 0 or (not mouvements_blancs and tour_blanc):
+        return "noirs"
+    elif pieces_noires == 0 or (not mouvements_noirs and not tour_blanc):
+        return "blancs"
+    return None
 
 # Création de la fenêtre principale
 fenetre = Tk()
