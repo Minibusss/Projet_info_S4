@@ -3,6 +3,7 @@ from tkinter import *
 piece_selectionee = None
 coups_possibles = []
 CASES_JOUABLES = 'white'  # ou 'white' pour jouer sur les cases noires
+tour_blanc = True  # True pour les blancs, False pour les noirs
 
 def est_case_jouable(row, col):
     #Vérifie si une case est jouable selon la configuration
@@ -13,7 +14,7 @@ def placer_piece(row, col, piece):
     return piece  # Fonction pour placer une pièce sur le damier
 
 def click_pion(event, row, col):
-    global piece_selectionee, coups_possibles
+    global piece_selectionee, coups_possibles, tour_blanc
     
     # Reset les couleurs de toutes les cases
     reset_couleurs()
@@ -39,79 +40,125 @@ def click_pion(event, row, col):
             print(f"Pas de pion en {row},{col}")
             Label(fenetre, text="Pas de pion à cette position", bg='red').grid(row=8, column=0, columnspan=8)
             return
+        
+        # Vérifier si c'est le bon tour
+        piece_items = widgets[0].find_all()
+        piece_color = widgets[0].itemcget(piece_items[0], 'fill')
+        if (piece_color == 'white' and not tour_blanc) or (piece_color == 'black' and tour_blanc):
+            print(f"Ce n'est pas votre tour")
+            Label(fenetre, text=f"Tour des {tour_blanc and 'blancs' or 'noirs'}", 
+                  bg='red').grid(row=8, column=0, columnspan=8)
+            return
             
         # Premier click - selection d'une piece
         piece_selectionee = (row, col)
         print(f"Pion sélectionné en {row},{col}")
-        # Met un fond jaune sur la case sélectionnée
         event.widget.configure(bg='yellow')
         coups_possibles, coups_bloques = calcul_coups_possibles(row, col)
-        # Met un fond vert sur les cases possibles
-        # Met un fond rouge sur les cases bloquées
         montre_coups_possibles(coups_possibles, coups_bloques)
     else:
         # Deuxième click - déplacement de la pièce
-        # Vérifier si le mouvement est valide
         if (row, col) in coups_possibles:
             print(f"Déplacement de {piece_selectionee} vers {row},{col}")
-            deplacer_piece(piece_selectionee[0], piece_selectionee[1], row, col)
+            autres_captures = deplacer_piece(piece_selectionee[0], piece_selectionee[1], row, col)
+            
+            if autres_captures:
+                # Continuer avec le même pion
+                piece_selectionee = (row, col)
+                coups_possibles, coups_bloques = calcul_coups_possibles(row, col)
+                montre_coups_possibles(coups_possibles, coups_bloques)
+            else:
+                # Fin du tour
+                piece_selectionee = None
+                coups_possibles = []
+                tour_blanc = not tour_blanc
+                Label(fenetre, text=f"Tour des {tour_blanc and 'blancs' or 'noirs'}", 
+                      bg='white').grid(row=8, column=0, columnspan=8)
         elif (row, col)==piece_selectionee:
-            # Si on clique sur la même case, on annule la sélection
             print(f"Annulation de la sélection de {piece_selectionee}")
             event.widget.configure(bg='white' if (row+col)%2==0 else 'black')
             piece_selectionee = None
-       
         else:
             print(f"Mouvement invalide de {piece_selectionee} vers {row},{col}")
             Label(fenetre, text="Mouvement invalide", bg='red').grid(row=8, column=0, columnspan=8)
-        # Réinitialiser la sélection de la pièce 
+        
         piece_selectionee = None
         coups_possibles = []
-        
 
 def calcul_coups_possibles(row, col):
     moves = []
     coups_bloques = []
-    # Déterminer la couleur du pion
+    captures = []  # Nouveau: stocke les captures possibles
+    
     widgets = fenetre.grid_slaves(row=row, column=col)
     if widgets and hasattr(widgets[0], 'find_all'):
-        # On vérifie la couleur du pion (oval)
         piece_items = widgets[0].find_all()
         if piece_items:
             piece_color = widgets[0].itemcget(piece_items[0], 'fill')
-    else:
-        # Si la case est vide, on ne peut pas déterminer la couleur
-        piece_color = None
+            # Vérifie les captures dans toutes les directions
+            captures = cherche_captures(row, col, piece_color, [])
+            
+            # Si des captures sont possibles, ce sont les seuls coups permis
+            if captures:
+                return captures, coups_bloques
+            
+            # Sinon, chercher les mouvements simples
+            # Direction dépend de la couleur du pion
+            direction = 1 if piece_color == 'white' else -1  # blanc vers le bas, noir vers le haut
+            
+            for dx in [-1, 1]:  # Gauche et droite
+                new_row = row + direction
+                new_col = col + dx
+                if 0 <= new_row < 8 and 0 <= new_col < 8:
+                    widgets = fenetre.grid_slaves(row=new_row, column=new_col)
+                    if widgets and hasattr(widgets[0], 'find_all') and widgets[0].find_all():
+                        coups_bloques.append((new_row, new_col))
+                    else:
+                        moves.append((new_row, new_col))
     
-    direction = 1 if piece_color == 'white' else -1
-    
-    # Mouvements simples et captures
-    for dx in [-1, 1]:
-        new_row = row + direction
-        new_col = col + dx
-        if 0 <= new_row < 8 and 0 <= new_col < 8:
-            # Vérifier si la case est occupée
-            widgets = fenetre.grid_slaves(row=new_row, column=new_col)
-            if widgets and hasattr(widgets[0], 'find_all') and widgets[0].find_all():
-                # Case occupée, vérifier si on peut capturer
-                piece_items = widgets[0].find_all()
-                if piece_items:
-                    other_color = widgets[0].itemcget(piece_items[0], 'fill')
-                    if other_color != piece_color:  # Pion adverse
-                        # Vérifier la case suivante pour la capture
-                        capture_row = new_row + direction
-                        capture_col = new_col + dx
-                        if 0 <= capture_row < 8 and 0 <= capture_col < 8:
-                            capture_widgets = fenetre.grid_slaves(row=capture_row, column=capture_col)
-                            if not (capture_widgets and hasattr(capture_widgets[0], 'find_all') 
-                                  and capture_widgets[0].find_all()):
-                                # Case libre après le pion adverse
-                                moves.append((capture_row, capture_col))
-                coups_bloques.append((new_row, new_col))
-            else:
-                moves.append((new_row, new_col))
-
     return moves, coups_bloques
+
+def cherche_captures(row, col, piece_color, chemin_parcouru=None):
+    """Cherche récursivement toutes les captures possibles"""
+    if chemin_parcouru is None:
+        chemin_parcouru = []
+    
+    captures = []
+    
+    # Vérifie les captures dans toutes les directions
+    for direction in [-1, 1]:  # Avant et arrière
+        for dx in [-1, 1]:  # Gauche et droite
+            new_row = row + direction * 2
+            new_col = col + dx * 2
+            
+            # Position du pion à capturer
+            capture_row = row + direction
+            capture_col = col + dx
+            
+            if 0 <= new_row < 8 and 0 <= new_col < 8:
+                # Vérifie si il y a un pion adverse à capturer
+                capture_widgets = fenetre.grid_slaves(row=capture_row, column=capture_col)
+                if (capture_widgets and hasattr(capture_widgets[0], 'find_all') 
+                    and capture_widgets[0].find_all()):
+                    capture_items = capture_widgets[0].find_all()
+                    if capture_items:
+                        other_color = capture_widgets[0].itemcget(capture_items[0], 'fill')
+                        
+                        # Vérifie si c'est un pion adverse et si la case d'arrivée est libre
+                        dest_widgets = fenetre.grid_slaves(row=new_row, column=new_col)
+                        if (other_color != piece_color and dest_widgets 
+                            and not (hasattr(dest_widgets[0], 'find_all') 
+                            and dest_widgets[0].find_all())):
+                            
+                            # Évite de repasser par le même chemin
+                            if (new_row, new_col) not in chemin_parcouru:
+                                captures.append((new_row, new_col))
+                                # Cherche d'autres captures possibles après celle-ci
+                                suites = cherche_captures(new_row, new_col, piece_color, 
+                                                        chemin_parcouru + [(row, col)])
+                                captures.extend(suites)
+    
+    return captures
 
 def reset_couleurs():
     for i in range(8):
@@ -146,20 +193,42 @@ def deplacer_piece(old_row, old_col, new_row, new_col):
     
     # Récupérer la couleur du pion
     piece_items = old_piece.find_all()
-    if piece_items:
-        piece_color = old_piece.itemcget(piece_items[0], 'fill')
+    if not piece_items:
+        return
+    piece_color = old_piece.itemcget(piece_items[0], 'fill')
+    
+    # Vérifier s'il y a capture (distance > 1)
+    if abs(new_row - old_row) > 1:
+        # Calculer la position du pion capturé
+        captured_row = (old_row + new_row) // 2
+        captured_col = (old_col + new_col) // 2
         
-        # Supprimer le pion de l'ancienne position
-        old_piece.delete("all")
-        old_piece.configure(bg='white' if (old_row + old_col) % 2 == 0 else 'black')
-        
-        # Créer le pion dans la nouvelle position
-        new_widgets = fenetre.grid_slaves(row=new_row, column=new_col)
-        if new_widgets:
-            new_canvas = new_widgets[0]
-            new_canvas.configure(bg='white' if (new_row + new_col) % 2 == 0 else 'black')
-            new_canvas.create_oval(10, 10, 70, 70, fill=piece_color, 
-                                 outline='black' if piece_color=='white' else 'white', width=2)
+        # Supprimer le pion capturé
+        captured_widgets = fenetre.grid_slaves(row=captured_row, column=captured_col)
+        if captured_widgets:
+            captured_piece = captured_widgets[0]
+            captured_piece.delete("all")
+            captured_piece.configure(bg='white' if (captured_row + captured_col) % 2 == 0 else 'black')
+    
+    # Supprimer le pion de l'ancienne position
+    old_piece.delete("all")
+    old_piece.configure(bg='white' if (old_row + old_col) % 2 == 0 else 'black')
+    
+    # Créer le pion dans la nouvelle position
+    new_widgets = fenetre.grid_slaves(row=new_row, column=new_col)
+    if new_widgets:
+        new_canvas = new_widgets[0]
+        new_canvas.configure(bg='white' if (new_row + new_col) % 2 == 0 else 'black')
+        new_canvas.create_oval(10, 10, 70, 70, fill=piece_color, 
+                             outline='black' if piece_color=='white' else 'white', width=2)
+    
+    # Vérifier s'il y a d'autres captures possibles
+    if abs(new_row - old_row) > 1:
+        captures = cherche_captures(new_row, new_col, piece_color)
+        if captures:
+            # Ne pas changer de tour si d'autres captures sont possibles
+            return True
+    return False
 
 def creer_damier():
     """Crée le damier avec la bonne configuration des cases jouables"""
@@ -188,10 +257,10 @@ def placer_pions_initiaux():
 # Création de la fenêtre principale
 fenetre = Tk()
 fenetre.title("Jeu de dames")
-fenetre.geometry("1000x750")
-fenetre.resizable(width=False, height=False)
+fenetre.minsize(width=1250, height=750)
 fenetre.iconbitmap("dames.ico")
 
 creer_damier()
 placer_pions_initiaux()
+Label(fenetre, text="Tour des blancs", bg='white').grid(row=8, column=0, columnspan=8)
 fenetre.mainloop()
