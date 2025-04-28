@@ -41,7 +41,7 @@ def bruler_pion(row, col):
         Label(cadre_jeu, text="Pion brûlé !", bg='blue').grid(row=8, column=0, columnspan=8)
 
 def click_pion(event, row, col):
-    global piece_selectionee, coups_possibles, tour_blanc, mode_bruler
+    global piece_selectionee, coups_possibles, tour_blanc, mode_bruler, dernier_coup
     
     # Enlève les messages précédents
     for widget in cadre_jeu.grid_slaves(row=8):
@@ -61,11 +61,6 @@ def click_pion(event, row, col):
                 if (row, col) in captures_obligatoires:
                     print(f"Pion en {row},{col} brûlé : capture obligatoire non effectuée")
                     bruler_pion(row, col)
-                    mode_bruler = False
-                    bouton_bruler.configure(bg='red')  # Reset couleur bouton
-                    tour_blanc = not tour_blanc  # Change le tour après brûlage
-                    Label(cadre_jeu, text=f"Tour des {tour_blanc and 'blancs' or 'noirs'}", 
-                          bg='white').grid(row=8, column=0, columnspan=8)
                 else:
                     print("Ce pion n'avait pas de capture obligatoire")
                     Label(cadre_jeu, text="Brûlage invalide : pas de capture obligatoire", 
@@ -126,9 +121,8 @@ def click_pion(event, row, col):
             montre_coups_possibles(coups_possibles, coups_bloques)
     else:
         if (row, col) in coups_possibles:
-            # Vérifier s'il y avait des captures obligatoires
-            captures_obligatoires = verifier_captures_obligatoires()
-            was_capture = abs(row - piece_selectionee[0]) > 1
+            # Stocker le dernier coup avant le déplacement
+            dernier_coup = piece_selectionee
             
             # Effectuer le déplacement
             print(f"Déplacement de {piece_selectionee} vers {row},{col}")
@@ -144,6 +138,8 @@ def click_pion(event, row, col):
             
             # Fin du tour
             # Si il y avait des captures obligatoires et qu'aucune capture n'a été faite
+            captures_obligatoires = verifier_captures_obligatoires()
+            was_capture = abs(row - piece_selectionee[0]) > 1
             if captures_obligatoires and not was_capture:
                 # Brûler seulement le pion qui n'a pas fait de capture
                 if piece_selectionee in captures_obligatoires:
